@@ -5,7 +5,12 @@ import PyPDF2.errors # For scanning PDF
 import pdfplumber # For scanning PDF
 import re # For finding specific strings in files
 from docx import Document # For DOCX processing
-from langdetect import detect
+from langdetect import detect # Detecting language in DOCX
+from oletools.olevba import VBA_Parser # Detecting Macros in DOCX
+import zipfile # Compressed file detection
+import rarfile # Compressed file detection
+import py7zr # Compressed file detection
+import subprocess
 
 # ---------------------------------------.PDF--------------------------------------- 
 
@@ -50,17 +55,45 @@ def get_pdf_contents(filepath): # Read contents of the PDF file.
         print(i)
     print("\n")
 
-# ---------------------------------------.ZIP---------------------------------------
+# ------------------------------------COMPRESSED------------------------------------
+
+def check_zip_password(file_path): # ZIP password
+    try:
+        with zipfile.ZipFile(file_path) as zf:
+            if zf.testzip() is None:
+                return "ZIP file is not password protected or is valid."
+            else:
+                return "ZIP file might be corrupted."
+    except RuntimeError as e:
+        if 'encrypted' in str(e):
+            return "ZIP file is password protected."
+        return "ZIP file raised a runtime error."
+    
+def check_rar_password(file_path): # RAR password
+    try:
+        with rarfile.RarFile(file_path) as rf:
+            rf.extractall(pwd=None)
+            return "RAR file is not password protected."
+    except rarfile.NeedPassword:
+        return "RAR file is password protected."
+
+def check_7z_password(file_path):  # 7Z password
+    try:
+        with py7zr.SevenZipFile(file_path, mode='r') as z:
+            z.extractall()
+            return "7z file is not password protected."
+    except py7zr.exceptions.PasswordRequired:
+        return "7z file is password protected."
 
 # ---------------------------------------DOCX---------------------------------------
 
 def is_encrypted_docx(filepath): # Check for encyrption
     try:
         Document(filepath)
-        print("File is not encyrpted.\n")
+        print("File is not encyrpted.")
         return False
     except Exception:
-        print("File is encyrpted.\n")
+        print("File is encyrpted.")
         return True
     
 def is_password_protected_docx(filepath): # Check for password
@@ -77,9 +110,16 @@ def detect_language(filepath): # Detect language
     doc = Document(filepath)
     context = []
     for i in doc.paragraphs:
-        context.append(i)
+        context.append(i.text)
     text = ' '.join(context)
-    print(detect(text))
+    print("File is written in:",detect(text))
+
+def has_macros(file_path):
+    vbaparser = VBA_Parser(file_path)
+    if(vbaparser.detect_vba_macros()):
+        print("This DOCX file has macros in it.")
+    else:
+        print("No macros found in the file.")
 
 # -------------------------------------FILETYPE-------------------------------------
 
@@ -96,25 +136,46 @@ def get_filetype(filename): # Main function to handle filetype operations
     try:
         file_extension_name = get_extension_name(filename)
         file_extension_magic = get_extension_magic(filename)
-        if (file_extension_name not in file_extension_magic):
-            print("Mismatch between actual extension and the filename extension in the file!!!")
-            print("This file might be a malware!!!")
-            print("This file appears to have the extension:", file_extension_name)
-            print("This file has the extension:\n", file_extension_magic)
-        else:
-            print("This file has the extension:\n", file_extension_magic)
+        print("This file appears to have the extension:", file_extension_name)
+        print("This file has the extension:", file_extension_magic)
+        print("\n")
     except Exception as err:
         print(err)
     return file_extension_magic
+
+# ----------------------------------------PE----------------------------------------
+
+def extract_strings(filepath):
+    try:
+        # Run the strings command
+        result = subprocess.run(['strings', filepath], capture_output=True, text=True)
+        # Return the output if the command was successful
+        if result.returncode == 0:
+            print(result.stdout)
+        else:
+            return f"Error: {result.stderr}"
+    except FileNotFoundError:
+        return "Error: strings command not found. Ensure it is installed and available on your system path."
+
 
 # ---------------------------------------MAIN---------------------------------------
 
 filename = input("Enter Filename: ")
 filetype = get_filetype(filename)
+compressed_list = ["application/zip","application/x-rar","application/x-7z-compressed"]
 if (filetype == "pdf"):
     if( not is_password_protected_pdf(filename)):
         get_pdf_contents(filename)
-if (filetype == ".docx" or filetype == ".doc"):
+elif (filetype == "vnd.openxmlformats-officedocument.wordprocessingml.document"):
     if(not is_encrypted_docx(filename)):
         if(not is_password_protected_docx(filename)):
             detect_language(filename)
+            has_macros(filename)
+elif(filetype == "application/zip"):
+    check_zip_password(filename)
+elif(filetype == "application/x-rar"):
+    check_rar_password(filename)
+elif(filetype == "application/x-7z-compressed"):
+    check_7z_password(filename)
+elif(filetype == "executable" or filetype == "dll"):
+    extract_strings(filename)
