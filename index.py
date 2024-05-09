@@ -5,6 +5,7 @@ import PyPDF2.errors # For scanning PDF
 import pdfplumber # For scanning PDF
 import re # For finding specific strings in files
 from docx import Document # For DOCX processing
+from langdetect import detect
 
 # ---------------------------------------.PDF--------------------------------------- 
 
@@ -53,7 +54,7 @@ def get_pdf_contents(filepath): # Read contents of the PDF file.
 
 # ---------------------------------------DOCX---------------------------------------
 
-def is_encrypted_docx(filepath):
+def is_encrypted_docx(filepath): # Check for encyrption
     try:
         Document(filepath)
         print("File is not encyrpted.\n")
@@ -62,7 +63,7 @@ def is_encrypted_docx(filepath):
         print("File is encyrpted.\n")
         return True
     
-def is_password_protected_docx(filepath):
+def is_password_protected_docx(filepath): # Check for password
     try:
         doc = Document(filepath)
         doc.paragraphs
@@ -71,6 +72,14 @@ def is_password_protected_docx(filepath):
     except Exception:
         print("File is password protected.")
         return True
+
+def detect_language(filepath): # Detect language
+    doc = Document(filepath)
+    context = []
+    for i in doc.paragraphs:
+        context.append(i)
+    text = ' '.join(context)
+    print(detect(text))
 
 # -------------------------------------FILETYPE-------------------------------------
 
@@ -108,4 +117,4 @@ if (filetype == "pdf"):
 if (filetype == ".docx" or filetype == ".doc"):
     if(not is_encrypted_docx(filename)):
         if(not is_password_protected_docx(filename)):
-            print("bruh")
+            detect_language(filename)
