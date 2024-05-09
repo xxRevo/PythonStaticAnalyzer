@@ -153,9 +153,9 @@ def extract_strings(filepath):
         if result.returncode == 0:
             print(result.stdout)
         else:
-            return f"Error: {result.stderr}"
+            return result.stderr
     except FileNotFoundError:
-        return "Error: strings command not found. Ensure it is installed and available on your system path."
+        return "strings command not found."
 
 
 # ---------------------------------------MAIN---------------------------------------
