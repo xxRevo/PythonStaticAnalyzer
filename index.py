@@ -10,7 +10,10 @@ from oletools.olevba import VBA_Parser # Detecting Macros in DOCX
 import zipfile # Compressed file detection
 import rarfile # Compressed file detection
 import py7zr # Compressed file detection
-import subprocess
+import subprocess # For Strings command
+import pefile # For PE header analysis
+import os # For PE header analysis
+import datetime # For PE header analysis
 
 # ---------------------------------------.PDF--------------------------------------- 
 
@@ -35,7 +38,7 @@ def get_pdf_contents(filepath): # Read contents of the PDF file.
     domains = []
     url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
     ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
-    domain_pattern = re.compile(r'\b(?:[\w-]+\.)+[a-zA-Z]{2,6}(?!\.\w+)\b')
+    domain_pattern = re.compile(r'^((?!-)[A-Za-z0–9-]{1, 63}(?<!-)\.)+[A-Za-z]{2, 6}$')
     with pdfplumber.open(filepath) as pdf:
         pages = pdf.pages
         for page in pages:
@@ -43,7 +46,7 @@ def get_pdf_contents(filepath): # Read contents of the PDF file.
             if text:
                 urls.extend(url_pattern.findall(text))
                 ips.extend(ip_pattern.findall(text))
-                domains.extend(domain_pattern.findall(text)) #fix domain issue
+                domains.extend(domain_pattern.findall(text))
     print("URLs:")
     for i in urls:
         print(i)
@@ -151,12 +154,84 @@ def extract_strings(filepath):
         result = subprocess.run(['strings', filepath], capture_output=True, text=True)
         # Return the output if the command was successful
         if result.returncode == 0:
-            print(result.stdout)
+            urls = []
+            ips = []
+            domains = []
+            url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
+            ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+            domain_pattern = re.compile(r'^((?!-)[A-Za-z0–9-]{1, 63}(?<!-)\.)+[A-Za-z]{2, 6}$')
+            stdout_string = result.stdout.split()
+            for i in stdout_string:
+                urls.extend(url_pattern.findall(i))
+                ips.extend(ip_pattern.findall(i))
+                domains.extend(domain_pattern.findall(i))
+            print("URLs:")
+            for i in urls:
+                print(i)
+            print("----------\nIPs:")
+            for i in ips:
+                print(i)
+            print("----------\nDomains:")
+            for i in domains:
+                print(i)
+            print("\n")
         else:
             return result.stderr
     except FileNotFoundError:
         return "strings command not found."
+    
+def analyze_header(filepath):
+    pe = pefile.PE(filepath)
+    data = {
+        'Architecture': 'x64' if pe.FILE_HEADER.Machine == 0x8664 else 'x86',
+        'Entropy': 0,
+        'File Size': os.path.getsize(filepath),
+        'Number of Sections': len(pe.sections),
+        'Compilation Date': datetime.datetime.utcfromtimestamp(pe.FILE_HEADER.TimeDateStamp).strftime('%Y-%m-%d %H:%M:%S'),
+    }
 
+    sections = []
+    # Details of each section
+    for section in pe.sections:
+        section_data = {
+            'Name': section.Name.decode().strip('\x00'),
+            'Entropy': section.get_entropy(),
+            'Virtual Size': section.Misc_VirtualSize,
+            'Raw Size': section.SizeOfRawData
+        }
+        sections.append(section_data)
+
+    imported_dlls = []
+    # DLL imports
+    if hasattr(pe, 'DIRECTORY_ENTRY_IMPORT'):
+        for entry in pe.DIRECTORY_ENTRY_IMPORT:
+            dll_name = entry.dll.decode()
+            imported_dlls.append(dll_name)
+    
+    print("\nGENERAL INFORMATION")
+    print("--------------------")
+    for key,value in data.items():
+        print(key,":",value)
+    
+    print("\nSECTION INFORMATION")
+    print("--------------------")
+    for i in sections:
+        for key,value in i.items():
+            print(key,":",value)
+
+    print("\nIMPORT INFORMATION")
+    print("--------------------")
+    for i in imported_dlls:
+        print(i)
+    
+    analyze_packing(sections)
+
+def analyze_packing(sections): # Check for packing status
+    for i in sections:
+        if(i['Entropy'] > 7.0):
+            print("Section",i['Name'],"has high entropy:",i['Entropy'])
+        if(i['Virtual Size'] / i['Raw Size'] > 2.0):
+            print("Section",i['Name'],"has high virtual size compared to raw size, Virtual Size: ",i['Virtual Size'],"Raw Size:",i['Raw Size'])
 
 # ---------------------------------------MAIN---------------------------------------
 
@@ -177,5 +252,6 @@ elif(filetype == "application/x-rar"):
     check_rar_password(filename)
 elif(filetype == "application/x-7z-compressed"):
     check_7z_password(filename)
-elif(filetype == "executable" or filetype == "dll"):
+elif(filetype == "executable" or filetype == "x-dosexec"):
     extract_strings(filename)
+    analyze_header(filename)
