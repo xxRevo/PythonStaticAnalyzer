@@ -17,6 +17,7 @@ import os # For PE header analysis
 import datetime # For PE header analysis
 import webbrowser # For displaying results as HTML
 import threading # For multithreading
+from threading import Lock # For fluent HTML display
 
 # --------------------------------------HTML--------------------------------------
 
@@ -32,22 +33,18 @@ def is_password_protected_pdf(filepath): # Check if PDF is encyrpted.
         with open(filepath, "rb") as file:
             pdf_reader = PyPDF2.PdfReader(file)
             if pdf_reader.is_encrypted:
-                print("This PDF file is password protected.\n")
                 return True
             else:
-                print("This PDF file is not password protected.\n")
                 return False
-    except Exception as err:
-        print("Error while processing the PDF file.\n")
-        print(err)
+    except Exception:
         return True
 
-def get_pdf_contents(filepath): # Read contents of the PDF file.
+def get_pdf_contents(filepath,html_content): # Read contents of the PDF file.
     urls = []
     ips = []
     domains = []
-    url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
-    ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+    url_pattern = re.compile(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})')
+    ip_pattern = re.compile(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$')
     domain_pattern = re.compile(r'^((?!-)[A-Za-z0–9-]{1, 63}(?<!-)\.)+[A-Za-z]{2, 6}$')
     with pdfplumber.open(filepath) as pdf:
         pages = pdf.pages
@@ -57,83 +54,76 @@ def get_pdf_contents(filepath): # Read contents of the PDF file.
                 urls.extend(url_pattern.findall(text))
                 ips.extend(ip_pattern.findall(text))
                 domains.extend(domain_pattern.findall(text))
-    print("URLs:")
+    html_content = html_content + """<h1>Strings</h1><table>
+    <tr><th>Category</th><th>String</th></tr>"""
     for i in urls:
-        print(i)
-    print("----------\nIPs:")
+        html_content = html_content + f"""<tr><td>URL</td><td>{i}</td></tr>"""
     for i in ips:
-        print(i)
-    print("----------\nDomains:")
+        html_content = html_content + f"""<tr><td>IP</td><td>{i}</td></tr>"""
     for i in domains:
-        print(i)
-    print("\n")
+        html_content = html_content + f"""<tr><td>Domain</td><td>{i}</td></tr>"""
+    html_content = html_content + """</table>"""
+    return html_content
 
 # ------------------------------------COMPRESSED------------------------------------
 
-def check_zip_password(file_path): # ZIP password
+def check_zip_password(file_path,html_content): # ZIP password
     try:
         with zipfile.ZipFile(file_path) as zf:
             if zf.testzip() is None:
-                return "ZIP file is not password protected."
-            else:
-                return "ZIP file might be corrupted."
-    except RuntimeError as e:
-        if 'encrypted' in str(e):
-            return "ZIP file is password protected."
-        return "ZIP file raised a runtime error."
+                return html_content + """<h1>General Information</h1><h2>This ZIP file is not password protected.</h2>"""
+    except Exception:
+        return html_content + """<h1>General Information</h1><h2>This ZIP file is password protected.</h2>"""
     
-def check_rar_password(file_path): # RAR password
+def check_rar_password(file_path,html_content): # RAR password
     try:
         with rarfile.RarFile(file_path) as rf:
             rf.extractall(pwd=None)
-            return "RAR file is not password protected."
-    except rarfile.NeedPassword:
-        return "RAR file is password protected."
+            return html_content + """<h1>General Information</h1><h2>This RAR file is not password protected.</h2>"""
+    except Exception:
+        return html_content + """<h1>General Information</h1><h2>This RAR file is password protected.</h2>"""
 
-def check_7z_password(file_path):  # 7ZIP password
+def check_7z_password(file_path,html_content):  # 7ZIP password
     try:
         with py7zr.SevenZipFile(file_path, mode='r') as z:
             z.extractall()
-            return "7z file is not password protected."
-    except py7zr.exceptions.PasswordRequired:
-        return "7z file is password protected."
+            return html_content + """<h1>General Information</h1><h2>This 7ZIP file is not password protected.</h2>"""
+    except Exception:
+        return html_content + """<h1>General Information</h1><h2>This 7ZIP file is password protected.</h2>"""
 
 # ---------------------------------------DOCX---------------------------------------
 
 def is_encrypted_docx(filepath): # Check for encyrption
     try:
         Document(filepath)
-        print("File is not encyrpted.")
         return False
     except Exception:
-        print("File is encyrpted.")
         return True
     
 def is_password_protected_docx(filepath): # Check for password
     try:
         doc = Document(filepath)
         doc.paragraphs
-        print("File is not password protected.")
         return False
     except Exception:
-        print("File is password protected.")
         return True
 
-def detect_language(filepath): # Detect language
+def detect_language(filepath,html_content): # Detect language
     doc = Document(filepath)
     context = []
     for i in doc.paragraphs:
         context.append(i.text)
     text = ' '.join(context)
-    print("File is written in:",detect(text))
+    html_content = html_content + f"""<h1>General Information</h1><h2>Document language: {detect(text)}</h2>"""
+    return html_content
 
-def has_macros(file_path):
-    vbaparser = VBA_Parser(file_path)
+def has_macros(filepath,html_content):
+    vbaparser = VBA_Parser(filepath)
     if(vbaparser.detect_vba_macros()):
-        print("This DOCX file has macros in it.")
+        html_content = html_content + """<h2>Document contains macros which may be harmful or malicious!</h2>"""
     else:
-        print("No macros found in the file.")
-
+        html_content = html_content + """<h2>Document does not contain any macros.</h2>"""
+    return html_content
 # -------------------------------------FILETYPE-------------------------------------
 
 def get_extension_name(filepath): # Get filetype based on filename
@@ -145,16 +135,16 @@ def get_extension_magic(filepath): # Get filetype based on magic value
     file_type = file_type.split('/')[1]
     return file_type
 
-def get_filetype(filename): # Main function to handle filetype operations
+def get_filetype(filename,html_content): # Main function to handle filetype operations
     try:
         file_extension_name = get_extension_name(filename)
         file_extension_magic = get_extension_magic(filename)
-        print("This file appears to have the extension:", file_extension_name)
-        print("This file has the extension:", file_extension_magic)
-        print("\n")
+        html_content = html_content + """<h1>Filetype Information</h1>"""
+        html_content = html_content + f"""<h2>This file appears to have the extension: {file_extension_name}</h2>"""
+        html_content = html_content + f"""<h2>The file has the extension: {file_extension_magic}</h2>"""
     except Exception as err:
         print(err)
-    return file_extension_magic
+    return html_content,file_extension_magic
 
 # ----------------------------------------PE----------------------------------------
 
@@ -167,8 +157,8 @@ def extract_strings(filepath,html_content):
             urls = []
             ips = []
             domains = []
-            url_pattern = re.compile(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
-            ip_pattern = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
+            url_pattern = re.compile(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})')
+            ip_pattern = re.compile(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$')
             domain_pattern = re.compile(r'^((?!-)[A-Za-z0–9-]{1, 63}(?<!-)\.)+[A-Za-z]{2, 6}$')
             stdout_string = result.stdout.split()
             for i in stdout_string:
@@ -190,7 +180,7 @@ def extract_strings(filepath,html_content):
             return html_content
     except FileNotFoundError:
         return html_content
-    
+
 def analyze_header(filepath,html_content):
     pe = pefile.PE(filepath)
     data = {
@@ -198,7 +188,7 @@ def analyze_header(filepath,html_content):
         'Entropy': 0, #fix
         'File Size': os.path.getsize(filepath),
         'Number of Sections': len(pe.sections),
-        'Compilation Date': datetime.datetime.utcfromtimestamp(pe.FILE_HEADER.TimeDateStamp).strftime('%Y-%m-%d %H:%M:%S'),
+        'Compilation Date': datetime.datetime.fromtimestamp(pe.FILE_HEADER.TimeDateStamp).strftime('%Y-%m-%d %H:%M:%S'),
     }
 
     sections = []
@@ -211,6 +201,8 @@ def analyze_header(filepath,html_content):
             'Raw Size': section.SizeOfRawData
         }
         sections.append(section_data)
+
+    data['Entropy'] = calculate_overall_entropy(sections)
 
     imported_dlls = []
     # DLL imports
@@ -238,6 +230,18 @@ def analyze_header(filepath,html_content):
     html_content = html_content + "</table>"
     return html_content,sections
 
+def calculate_overall_entropy(sections):
+    entropy = 0.0
+    val = 0
+    for i in sections:
+        if (entropy == 0.0):
+            entropy = i['Entropy']
+            val = i['Raw Size']
+        else:
+            entropy = (entropy*val + i['Entropy']*i['Raw Size']) / (val + i['Raw Size'])
+            val = val + i['Raw Size']
+    return entropy
+
 def analyze_packing(sections,html_content): # Check for packing status
     packing_probability = 0
     for i in sections:
@@ -264,7 +268,7 @@ def analyze_packing(sections,html_content): # Check for packing status
     elif packing_probability == 50:
         html_content = html_content + "<h2>This file may be packed using an algortihm that is not in the signature database.</h2>"
     else:
-        html_content = html_content + "<h2>This file does not appear to be packed.</h2>"
+        html_content = html_content + "<h2>This is not packed.</h2>"
     return html_content
 
 def load_signature_database(filepath): # Helper function for find_packer()
@@ -299,36 +303,41 @@ def main_func(filename):
                 body { font-family: Arial, sans-serif; }
                 table { width: 100%; border-collapse: collapse; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
             </style>
         </head>
         <body>"""
-    filetype = get_filetype(filename)
+    html_content,filetype = get_filetype(filename,html_content)
     if (filetype == "pdf"):
         if( not is_password_protected_pdf(filename)):
-            get_pdf_contents(filename)
+            html_content = get_pdf_contents(filename,html_content)
+        else:
+            html_content = html_content + """<h1>General Information</h1><h2>PDF File is password protected.</h2>"""
     elif (filetype == "vnd.openxmlformats-officedocument.wordprocessingml.document"):
         if(not is_encrypted_docx(filename)):
             if(not is_password_protected_docx(filename)):
-                detect_language(filename)
-                has_macros(filename)
-    elif(filetype == "application/zip"):
-        check_zip_password(filename)
-    elif(filetype == "application/x-rar"):
-        check_rar_password(filename)
-    elif(filetype == "application/x-7z-compressed"):
-        check_7z_password(filename)
+                html_content = detect_language(filename,html_content)
+                html_content = has_macros(filename,html_content)
+        else:
+            html_content = html_content + """<h1>General Information</h1><h2>DOC File is password protected.</h2>"""
+    elif(filetype == "zip"):
+        html_content = check_zip_password(filename,html_content)
+    elif(filetype == "x-rar"):
+        html_content = check_rar_password(filename,html_content)
+    elif(filetype == "x-7z-compressed"):
+        html_content = check_7z_password(filename,html_content)
     elif(filetype == "executable" or filetype == "x-dosexec"):
         html_content, sections = analyze_header(filename,html_content)
         html_content = find_packer(filename,sections,html_content)
         html_content = extract_strings(filename,html_content)
     html_content = html_content + """</body></html>"""
+    mutex_lock.acquire()
     write_html(html_content,'./outputs/'+filename+'.html')
-
+    mutex_lock.release()
 
 print("Enter filenames that you want to analyze, for entry of multiple files separate them by ',' character.")
 filenames = input("Enter Filename(s): ")
 threads = []
+mutex_lock = Lock()
 if (filenames.count(",") > 0):
     for i in filenames.split(","):
         i = i.strip()
