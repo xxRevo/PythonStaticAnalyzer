@@ -1,4 +1,4 @@
-libraries used within the scope of the assingment and their purpose:
+***libraries used within the scope of the assingment and their purpose:
 
 magic # For filetype detection
 Path # For filetype detection
@@ -20,6 +20,8 @@ webbrowser # For displaying results as HTML
 threading # For multithreading
 
 
-command line prompt to install libraries needed:
+***command line prompt to install libraries needed:
 
 pip install python-magic pathlib2 PyPDF2 pdfplumber re python-docx python-pptx langdetect oletools zipfile py7zr pefile peutils webbrowser
+
+***Example runs can be found in ./outputs folder

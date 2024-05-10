@@ -177,21 +177,20 @@ def extract_strings(filepath,html_content):
         else:
             html_content = html_content + "<h1>Strings</h1><h2>Strings command yielded no results.</h2>"
             return html_content
-    except FileNotFoundError:
+    except:
         return html_content
 
 def analyze_header(filepath,html_content):
     pe = pefile.PE(filepath)
     data = {
         'Architecture': 'x86-x64' if pe.FILE_HEADER.Machine == 0x8664 else 'x86',
-        'Entropy': 0, #fix
+        'Entropy': 0, #Value adjusted later
         'File Size': os.path.getsize(filepath),
         'Number of Sections': len(pe.sections),
         'Compilation Date': datetime.datetime.fromtimestamp(pe.FILE_HEADER.TimeDateStamp).strftime('%Y-%m-%d %H:%M:%S'),
     }
 
     sections = []
-    # Details of each section
     for section in pe.sections:
         section_data = {
             'Name': section.Name.decode().strip('\x00'),
@@ -204,7 +203,6 @@ def analyze_header(filepath,html_content):
     data['Entropy'] = calculate_overall_entropy(sections)
 
     imported_dlls = []
-    # DLL imports
     if hasattr(pe, 'DIRECTORY_ENTRY_IMPORT'):
         for entry in pe.DIRECTORY_ENTRY_IMPORT:
             dll_name = entry.dll.decode()
