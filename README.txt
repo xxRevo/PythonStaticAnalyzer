@@ -6,10 +6,10 @@ PyPDF2 # For scanning PDF
 pdfplumber # For scanning PDF
 re # For finding specific strings in files
 docx # For DOCX processing
+pptx # For PPTX processing
 langdetect # Detecting language in DOCX
 oletools.olevba # Detecting Macros in DOCX
 zipfile # Compressed file detection
-rarfile # Compressed file detection
 py7zr # Compressed file detection
 subprocess # For Strings command
 pefile # For PE header analysis
@@ -22,4 +22,4 @@ threading # For multithreading
 
 command line prompt to install libraries needed:
 
-pip install python-magic pathlib2 PyPDF2 pdfplumber re python-docx langdetect oletools zipfile rarfile py7zr pefile peutils webbrowser
+pip install python-magic pathlib2 PyPDF2 pdfplumber re python-docx python-pptx langdetect oletools zipfile py7zr pefile peutils webbrowser

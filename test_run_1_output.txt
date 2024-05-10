@@ -1,0 +1,106 @@
+Running status: False
+Player 1 Score: 0
+Player 2 Score 0
+([('Horizontal', 0, 0, 2), ('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), 0)
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 0, 0]
+[0, 0, 0]
+[0, 0, 0]
+Running status: False
+Player 1 Score: 0
+Player 2 Score 0
+([('Horizontal', 0, 0, 2), ('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), 0)
+0
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 1, 0]
+[0, 0, 0]
+[0, 0, 0]
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), 1)
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), 1)
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 1, 0]
+[0, 0, 0]
+[0, 0, 0]
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), 1)
+0
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 1, 0]
+[0, 0, -1]
+[0, 0, 0]
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), -6)
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), -6)
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 1, 0]
+[0, 0, -1]
+[0, 0, 0]
+Running status: False
+Player 1 Score: 1
+Player 2 Score -1
+([('Vertical', 2, 0, 2)], [])
+(('Vertical', 2, 0, 2), -6)
+1
+HHHHHHHHHH
+---
+[1, 0, 3]
+[0, 0, 0]
+[0, 0, 2]
+---
+[0, 1, 0]
+[0, 0, -2]
+[0, 0, 0]
+Running status: True
+Player 1 Score: 6
+Player 2 Score -6
+([], [])
+(None, -6)
+Game is over!
+Player 1's score:  6
+Player 2's score:  -6
+Player 1 has won!

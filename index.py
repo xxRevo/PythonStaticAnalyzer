@@ -5,10 +5,10 @@ import PyPDF2.errors # For scanning PDF
 import pdfplumber # For scanning PDF
 import re # For finding specific strings in files
 from docx import Document # For DOCX processing
+from pptx import Presentation # For PPTX processing
 from langdetect import detect # Detecting language in DOCX
 from oletools.olevba import VBA_Parser # Detecting Macros in DOCX
 import zipfile # Compressed file detection
-import rarfile # Compressed file detection
 import py7zr # Compressed file detection
 import subprocess # For Strings command
 import pefile # For PE header analysis
@@ -74,14 +74,6 @@ def check_zip_password(file_path,html_content): # ZIP password
                 return html_content + """<h1>General Information</h1><h2>This ZIP file is not password protected.</h2>"""
     except Exception:
         return html_content + """<h1>General Information</h1><h2>This ZIP file is password protected.</h2>"""
-    
-def check_rar_password(file_path,html_content): # RAR password
-    try:
-        with rarfile.RarFile(file_path) as rf:
-            rf.extractall(pwd=None)
-            return html_content + """<h1>General Information</h1><h2>This RAR file is not password protected.</h2>"""
-    except Exception:
-        return html_content + """<h1>General Information</h1><h2>This RAR file is password protected.</h2>"""
 
 def check_7z_password(file_path,html_content):  # 7ZIP password
     try:
@@ -99,7 +91,14 @@ def is_encrypted_docx(filepath): # Check for encyrption
         return False
     except Exception:
         return True
-    
+
+def is_encrypted_pptx(filepath): # Check for encyrption
+    try:
+        Presentation(filepath)
+        return False
+    except Exception:
+        return True
+
 def is_password_protected_docx(filepath): # Check for password
     try:
         doc = Document(filepath)
@@ -259,16 +258,12 @@ def analyze_packing(sections,html_content): # Check for packing status
             i['Raw Size'] = 1
         if(i['Virtual Size'] / i['Raw Size'] > 10.0):
             html_content = html_content + f"""<h2>- The section {i['Name']} has high Virtual to Raw size ratio with value {i['Virtual Size'] / i['Raw Size']}.</h2>"""
-    if packing_probability == 100:
-        html_content = html_content + "<h2>This file is certainly packed using an algortihm that is not in the signature database.</h2>"
-    elif packing_probability == 90:
-        html_content = html_content + "<h2>This file is almost certainly packed using an algortihm that is not in the signature database.</h2>"
-    elif packing_probability == 75:
-        html_content = html_content + "<h2>This file is most likely packed using an algortihm that is not in the signature database.</h2>"
-    elif packing_probability == 50:
-        html_content = html_content + "<h2>This file may be packed using an algortihm that is not in the signature database.</h2>"
+    if packing_probability > 70:
+        html_content = html_content + "<h2>This file is packed using an algortihm that is not in the signature database.</h2>"
+    elif 75 >= packing_probability >= 50:
+        html_content = html_content + "<h2>This file is likely packed using an algortihm that is not in the signature database.</h2>"
     else:
-        html_content = html_content + "<h2>This is not packed.</h2>"
+        html_content = html_content + "<h2>This file is not packed.</h2>"
     return html_content
 
 def load_signature_database(filepath): # Helper function for find_packer()
@@ -318,11 +313,14 @@ def main_func(filename):
                 html_content = detect_language(filename,html_content)
                 html_content = has_macros(filename,html_content)
         else:
-            html_content = html_content + """<h1>General Information</h1><h2>DOC File is password protected.</h2>"""
+            html_content = html_content + """<h1>General Information</h1><h2>DOCX File is password protected.</h2>"""
+    elif (filetype == "vnd.openxmlformats-officedocument.presentationml.presentation"):
+        if(not is_encrypted_pptx(filename)):
+            html_content = has_macros(filename,html_content)      
+        else:
+            html_content = html_content + """<h1>General Information</h1><h2>PPTX File is password protected.</h2>"""          
     elif(filetype == "zip"):
         html_content = check_zip_password(filename,html_content)
-    elif(filetype == "x-rar"):
-        html_content = check_rar_password(filename,html_content)
     elif(filetype == "x-7z-compressed"):
         html_content = check_7z_password(filename,html_content)
     elif(filetype == "executable" or filetype == "x-dosexec"):
